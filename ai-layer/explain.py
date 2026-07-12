@@ -8,7 +8,7 @@ and exactly how to fix it. This is the team's key differentiator.
 
 Provider: NVIDIA NIM (free, OpenAI-compatible) by default.
     export AI_PROVIDER="nvidia"          # default, no need to set explicitly
-    export NVIDIA_API_KEY="nvapi-..."    # get one free at https://build.nvidia.com
+    export NVIDIA_API_KEY=""    # get one free at https://build.nvidia.com
     export NVIDIA_MODEL="meta/llama-3.3-70b-instruct"   # optional override
 
 To use Anthropic (Claude) instead:
@@ -19,6 +19,7 @@ To use Anthropic (Claude) instead:
 import json
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Any, Protocol
@@ -26,6 +27,8 @@ from typing import Any, Protocol
 NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1"
 DEFAULT_NVIDIA_MODEL = "meta/llama-3.3-70b-instruct"
 DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-4-6"
+REQUEST_TIMEOUT_SECONDS = 45
+MAX_TOKENS = 350
 
 SYSTEM_PROMPT = """You are a friendly senior developer helping a beginner \
 understand a security vulnerability found by a static analysis scanner \
@@ -71,12 +74,17 @@ class NvidiaClient:
     def __init__(self, api_key: str, model: str = DEFAULT_NVIDIA_MODEL):
         import openai  # imported lazily so anthropic-only setups don't need it
         self.model = model
-        self._client = openai.OpenAI(base_url=NVIDIA_BASE_URL, api_key=api_key)
+        self._client = openai.OpenAI(
+            base_url=NVIDIA_BASE_URL,
+            api_key=api_key,
+            timeout=REQUEST_TIMEOUT_SECONDS,
+            max_retries=1,
+        )
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         response = self._client.chat.completions.create(
             model=self.model,
-            max_tokens=500,
+            max_tokens=MAX_TOKENS,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -91,12 +99,12 @@ class AnthropicClient:
     def __init__(self, api_key: str, model: str = DEFAULT_ANTHROPIC_MODEL):
         import anthropic  # imported lazily so nvidia-only setups don't need it
         self.model = model
-        self._client = anthropic.Anthropic(api_key=api_key)
+        self._client = anthropic.Anthropic(api_key=api_key, timeout=REQUEST_TIMEOUT_SECONDS)
 
     def complete(self, system_prompt: str, user_prompt: str) -> str:
         response = self._client.messages.create(
             model=self.model,
-            max_tokens=500,
+            max_tokens=MAX_TOKENS,
             system=system_prompt,
             messages=[{"role": "user", "content": user_prompt}],
         )
@@ -167,19 +175,45 @@ def explain_finding(finding: dict[str, Any], client: AIClient | None = None) -> 
     )
 
 
-def explain_findings(findings: list[dict[str, Any]]) -> list[Explanation]:
-    """Explain a whole list of raw findings (e.g. loaded from findings.json)."""
+def explain_findings(findings: list[dict[str, Any]], max_workers: int | None = None) -> list[Explanation]:
+    """
+    Explain a whole list of raw findings (e.g. loaded from findings.json).
+
+    Runs requests concurrently (default up to 4 at once, or set AI_MAX_WORKERS)
+    since each finding is independent — this is the main speed lever against
+    a slow/free API tier. Findings that fail (timeout, bad response, etc) are
+    skipped with a warning rather than blocking the rest.
+    """
     client = _get_client()
-    explanations = []
     total = len(findings)
-    for i, finding in enumerate(findings, start=1):
+    workers = max_workers or int(os.environ.get("AI_MAX_WORKERS", "4"))
+    workers = max(1, min(workers, total)) if total else 1
+
+    results: dict[int, Explanation] = {}
+
+    def _task(index: int, finding: dict[str, Any]) -> tuple[int, Explanation | None, str | None]:
         rule = finding.get("rule_id", "unknown-rule")
-        print(f"  [{i}/{total}] Explaining {rule} ...", flush=True)
         try:
-            explanations.append(explain_finding(finding, client=client))
+            return index, explain_finding(finding, client=client), None
         except Exception as e:
-            print(f"  ! Skipped {finding.get('rule_id')}: {e}", file=sys.stderr)
-    return explanations
+            return index, None, f"{rule}: {e}"
+
+    print(f"  Running {total} explanation(s) with {workers} parallel worker(s) ...", flush=True)
+
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_task, i, f) for i, f in enumerate(findings)]
+        done_count = 0
+        for future in as_completed(futures):
+            index, explanation, error = future.result()
+            done_count += 1
+            if error:
+                print(f"  ! [{done_count}/{total}] Skipped {error}", file=sys.stderr, flush=True)
+            else:
+                print(f"  ✓ [{done_count}/{total}] Done: {findings[index].get('rule_id')}", flush=True)
+                results[index] = explanation
+
+    # Preserve original findings order in the output.
+    return [results[i] for i in sorted(results.keys())]
 
 
 def save_explanations(explanations: list[Explanation], out_path: str) -> None:
