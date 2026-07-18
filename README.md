@@ -1,4 +1,4 @@
-````markdown
+
 # Ctrl+Alt+Delulu
 
 > **AI-powered security scanner for developers — built by three women at Hackathon 2026**
@@ -373,4 +373,3 @@ These are already included in `.gitignore`.
 **One scanner.**
 
 **Zero jargon.**
-````
