@@ -1,0 +1,47 @@
+{
+  "name": "ctrl-alt-delulu",
+  "displayName": "Ctrl+Alt+Delulu",
+  "description": "AI-powered security scanner — plain-language vulnerability explanations, typosquat detection, and a paste-time secret guard, built on Semgrep.",
+  "version": "0.1.0",
+  "publisher": "ctrl-alt-delulu",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Linters", "Other"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "ctrlAltDelulu.generateSummary",
+        "title": "Ctrl+Alt+Delulu: Generate Project Summary"
+      },
+      {
+        "command": "ctrlAltDelulu.interceptPaste",
+        "title": "Ctrl+Alt+Delulu: Paste (guarded)"
+      }
+    ],
+    "keybindings": [
+      {
+        "key": "ctrl+v",
+        "mac": "cmd+v",
+        "command": "ctrlAltDelulu.interceptPaste",
+        "when": "editorTextFocus"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^2.24.0"
+  }
+}
