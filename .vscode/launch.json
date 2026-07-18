@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Ctrl+Alt+Delulu Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/vscode-ext"],
+      "outFiles": ["${workspaceFolder}/vscode-ext/out/**/*.js"]
+    }
+  ]
+}
