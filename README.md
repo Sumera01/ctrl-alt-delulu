@@ -374,5 +374,3 @@ These are already included in `.gitignore`.
 
 **Zero jargon.**
 ````
-
-This version reflects a completed project: Parts **03** and **05** are complete, the development notes have been removed, the VS Code extension and Paste Guard are documented as finished features, and the overall README has been polished to read like a professional open-source project.
