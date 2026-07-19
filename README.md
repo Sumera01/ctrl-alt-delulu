@@ -175,8 +175,3 @@ Semgrep (open source) · NVIDIA NIM · Anthropic Claude (optional) · Python · 
 ## ctrl+alt+delulu
 
 **Three women. One scanner. Zero jargon.**
-
-
-git status
-git log --oneline -5
-```
