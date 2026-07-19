@@ -16,6 +16,7 @@ explanations.json
 .DS_Store
 .vscode/*
 !.vscode/extensions.json
+!.vscode/launch.json
 scan-state.json
 project-summary.json
 project-summary.txt
