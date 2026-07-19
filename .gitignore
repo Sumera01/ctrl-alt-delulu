@@ -21,3 +21,6 @@ project-summary.json
 project-summary.txt
 project-summary.html
 project-summary.pdf
+node_modules/
+vscode-ext/out/
+*.vsix
